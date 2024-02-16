@@ -135,3 +135,11 @@ WHERE NOT EXISTS (
 );
 
 -- 3.5 다른 테이블 행과 일치하지 않는 행 검색하기
+SELECT d.*
+FROM dept d LEFT OUTER JOIN emp e
+	ON (d.deptno = e.deptno)
+WHERE e.deptno IS NULL;
+
+SELECT e.ename, e.deptno AS emp_deptno, d.*
+FROM dept d LEFT OUTER JOIN emp e
+	ON (d.deptno = e.deptno);
