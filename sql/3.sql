@@ -143,3 +143,191 @@ WHERE e.deptno IS NULL;
 SELECT e.ename, e.deptno AS emp_deptno, d.*
 FROM dept d LEFT OUTER JOIN emp e
 	ON (d.deptno = e.deptno);
+	
+-- 3.6 다른 조인을 방해하지 않고 쿼리에 조인 추가하기
+-- CREATE TABLE emp_bonus(
+-- empno INT(4),
+-- received Date,
+-- type int(1));
+-- INSERT INTO emp_bonus
+-- VALUES
+-- (7369, STR_TO_DATE('14-3-2005', '%d-%m-%Y'), 1),
+-- (7900, STR_TO_DATE('14-3-2005', '%d-%m-%Y'), 2),
+-- (7788, STR_TO_DATE('14-3-2005', '%d-%m-%Y'), 3);
+
+SELECT * FROM emp_bonus;
+
+SELECT e.ename, d.loc
+FROM emp e, dept d
+WHERE e.deptno = d.deptno;
+
+SELECT e.ename, d.loc, eb.received
+FROM emp e, dept d, emp_bonus eb
+WHERE e.deptno = d.deptno AND e.empno = eb.empno;
+
+-- 외부조인을 통해서 원래 쿼리의 데이터 손실 없이 추가 정보를 얻을 수 있다.
+SELECT e.ename, d.loc, eb.received
+FROM emp e JOIN dept d
+	ON (e.deptno = d.deptno)
+	LEFT JOIN emp_bonus eb
+	ON (e.empno = eb.empno)
+ORDER BY 2;
+
+SELECT e.ename, d.loc,
+	(SELECT eb.received FROM emp_bonus eb
+	WHERE eb.empno = e.empno) AS received
+FROM emp e, dept d
+WHERE e.deptno = d.deptno
+ORDER BY 2;
+
+-- SELECT * FROM emp_bonus eb, emp e
+-- WHERE eb.empno = e.empno;
+
+-- 두 테이블에 같은 데이턱 있는지 확인
+-- DROP VIEW V;
+CREATE VIEW V
+AS
+SELECT * FROM emp WHERE deptno != 10
+UNION ALL
+SELECT * FROM emp WHERE ename = 'WARD';
+
+SELECT * FROM V;
+
+SELECT
+	*
+FROM
+	(
+	SELECT
+		e.empno,
+		e.ename,
+		e.job,
+		e.mgr,
+		e.hiredate,
+		e.sal,
+		e.comm,
+		e.deptno,
+		count(*) AS cnt
+	FROM
+		emp e
+	GROUP BY
+		empno,
+		ename,
+		job,
+		mgr,
+		hiredate,
+		sal,
+		comm,
+		deptno
+         ) e
+WHERE
+	NOT EXISTS (
+	SELECT
+		NULL
+	FROM
+		(
+		SELECT
+			v.empno,
+			v.ename,
+			v.job,
+			v.mgr,
+			v.hiredate,
+			v.sal,
+			v.comm,
+			v.deptno,
+			count(*) AS cnt
+		FROM
+			v
+		GROUP BY
+			empno,
+			ename,
+			job,
+			mgr,
+			hiredate,
+			sal,
+			comm,
+			deptno
+         ) v
+	WHERE
+		v.empno = e.empno
+		AND v.ename = e.ename
+		AND v.job = e.job
+		AND COALESCE(v.mgr, 0) = COALESCE(e.mgr, 0)
+			AND v.hiredate = e.hiredate
+			AND v.sal = e.sal
+			AND v.deptno = e.deptno
+			AND v.cnt = e.cnt
+			AND COALESCE(v.comm, 0) = COALESCE(e.comm, 0)
+  )
+UNION ALL
+    SELECT
+	*
+FROM
+	(
+	SELECT
+		v.empno,
+		v.ename,
+		v.job,
+		v.mgr,
+		v.hiredate,
+		v.sal,
+		v.comm,
+		v.deptno,
+		count(*) AS cnt
+	FROM
+		v
+	GROUP BY
+		empno,
+		ename,
+		job,
+		mgr,
+		hiredate,
+		sal,
+		comm,
+		deptno
+          ) v
+WHERE
+	NOT EXISTS (
+	SELECT
+		NULL
+	FROM
+		(
+		SELECT
+			e.empno,
+			e.ename,
+			e.job,
+			e.mgr,
+			e.hiredate,
+			e.sal,
+			e.comm,
+			e.deptno,
+			count(*) AS cnt
+		FROM
+			emp e
+		GROUP BY
+			empno,
+			ename,
+			job,
+			mgr,
+			hiredate,
+			sal,
+			comm,
+			deptno
+          ) e
+	WHERE
+		v.empno = e.empno
+		AND v.ename = e.ename
+		AND v.job = e.job
+		AND COALESCE(v.mgr, 0) = COALESCE(e.mgr, 0)
+			AND v.hiredate = e.hiredate
+			AND v.sal = e.sal
+			AND v.deptno = e.deptno
+			AND v.cnt = e.cnt
+			AND COALESCE(v.comm, 0) = COALESCE(e.comm, 0)
+);
+
+-- 테이블을 비교할 때 간단히 첫 번째 단계로, 데이터 비교에 카디널리티를 포함하는 대신, 오로지 카디널리티로만 비교할 수 있다.
+SELECT count(*)
+	FROM emp
+	UNION
+SELECT count(*)
+	FROM dept;
